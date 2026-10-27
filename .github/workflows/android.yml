@@ -4,7 +4,7 @@ on:
     paths: ['android/**', 'docs/ANDROID_LINK.md', '.github/workflows/android.yml']
   push:
     branches: [main]
-    paths: ['android/**']
+    paths: ['android/**', '.github/workflows/android.yml']
 jobs:
   build:
     runs-on: ubuntu-24.04
@@ -22,6 +22,14 @@ jobs:
         run: ./gradlew test assembleDebug lint --console=plain
       - name: No ads, billing or analytics (condition of the author's permission)
         run: "! grep -rEi 'admob|play-services-ads|billingclient|firebase-analytics|crashlytics|com.google.android.gms' app/build.gradle.kts"
+      # Installable debug APK for testing directly on a phone (not a signed release).
+      - name: Upload Android debug APK
+        uses: actions/upload-artifact@v7
+        with:
+          name: MyCouCoy-Android-debug
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@v7
         if: always()
         with:
