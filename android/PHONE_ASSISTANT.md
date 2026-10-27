@@ -10,6 +10,8 @@ computer. Desktop-linked agents, approvals, widgets and the existing island rema
 3. Enter a model ID available for your provider/account and save it.
 4. Paste your provider API key, then tap **Save key**.
 5. Open **Chat**, select the phone model in the model selector, and send a message.
+6. The Home screen now opens an AI landing page if your phone provider is configured; desktop pairing stays optional.
+7. In Chat, tap **Dictate** to use Android's installed speech recognition service, or **Read aloud** to hear a completed reply through Android Text-to-Speech.
 
 The on-phone provider is automatically available in Chat when its key exists. If you also
 pair a Coucou desktop, its offered models appear in the same selector. Desktop communication
@@ -36,14 +38,16 @@ is not required for phone models.
 - `assistant/CloudAssistant.kt`: cancellable HTTPS/SSE streaming; no UI/network blocking.
 - `app/AppModel.kt`: local/desktop routing and lifecycle; local traffic does not use LinkClient.
 - `ui/AssistantSettings.kt`: editable model and non-persistent secret editor.
-- `ui/ChatScreen.kt`: native AI feedback and mixed model selector.
+- `ui/ChatScreen.kt`: native AI feedback, mixed model selector, optional speech dictation and TTS.
+- `ui/AssistantHome.kt`: phone-first Home; optional desktop pairing is one tap away.
 - `ui/IslandOverlay.kt`: unchanged; now fed native activity state by AppModel.
 
 ## Current boundaries
 
 This milestone is a **standalone AI chat**, not yet a device-control agent. It does not
-control other apps, see the screen, capture the microphone, run background tasks or execute
-model-suggested commands. Those require separate permission-aware tools, user controls and
+control other apps, see the screen, listen continuously in the background, run background
+tasks or execute model-suggested commands. Voice dictation is user-initiated via the
+Android speech recognition activity and requires an installed recognition service. Those require separate permission-aware tools, user controls and
 instrumented Android device testing. The native chat currently uses the provider's cloud
 API and requires Internet; it is not an offline on-device model.
 

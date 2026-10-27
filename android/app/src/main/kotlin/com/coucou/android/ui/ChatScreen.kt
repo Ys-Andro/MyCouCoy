@@ -1,5 +1,14 @@
 package com.coucou.android.ui
 
+import android.app.Activity
+import android.content.Intent
+import android.speech.RecognizerIntent
+import android.speech.tts.TextToSpeech
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.DisposableEffect
+import java.util.Locale
+
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -169,7 +178,21 @@ fun ChatScreen(model: AppModel, onHome: () -> Unit, onSettings: () -> Unit) {
     val listState = rememberLazyListState()
     val messages = model.chatMessages
     val localMode = AssistantPolicy.fromLocalId(model.activeChatModel) != null
-    val spanish = AppLanguage.current(LocalContext.current).startsWith("es")
+    val context = LocalContext.current
+    val spanish = AppLanguage.current(context).startsWith("es")
+    val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val phrase = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+            if (!phrase.isNullOrBlank()) text = ShareDraft.into(text, phrase)
+        }
+    }
+    var ttsReady by remember { mutableStateOf(false) }
+    val tts = remember(context) {
+        TextToSpeech(context) { status -> ttsReady = status == TextToSpeech.SUCCESS }
+    }
+    DisposableEffect(tts) {
+        onDispose { tts.stop(); tts.shutdown() }
+    }
     val assistantEngine = remember {
         MochiEngine({ android.os.SystemClock.elapsedRealtimeNanos() / 1e6 })
     }
@@ -250,6 +273,35 @@ fun ChatScreen(model: AppModel, onHome: () -> Unit, onSettings: () -> Unit) {
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(Gap)) {
                     items(messages, key = { it.id }) { m -> Bubble(m) }
                 }
+            }
+        }
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            TextButton(
+                enabled = model.chatAvailable,
+                onClick = {
+                    val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                        putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault().toLanguageTag())
+                        putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+                    }
+                    runCatching { voiceLauncher.launch(intent) }.onFailure {
+                        model.message = if (spanish) "No se encontró un servicio de reconocimiento de voz."
+                            else "No speech recognition service is available."
+                    }
+                },
+            ) { Text(if (spanish) "Dictar" else "Dictate") }
+            val lastAnswer = messages.lastOrNull {
+                it.role == ChatRole.ASSISTANT && it.status == ChatStatus.DONE && it.text.isNotBlank()
+            }
+            if (ttsReady && lastAnswer != null) {
+                TextButton(onClick = {
+                    tts.language = Locale.getDefault()
+                    tts.speak(lastAnswer.text.take(3500), TextToSpeech.QUEUE_FLUSH, null, "coucou-voice-answer")
+                }) { Text(if (spanish) "Escuchar respuesta" else "Read aloud") }
             }
         }
         Composer(

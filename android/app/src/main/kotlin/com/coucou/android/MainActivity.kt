@@ -124,6 +124,7 @@ import com.coucou.android.ui.PairConfirm
 import com.coucou.android.ui.ScanScreen
 import com.coucou.android.ui.SessionScreen
 import com.coucou.android.ui.ChatScreen
+import com.coucou.android.ui.AssistantHome
 import com.coucou.android.ui.MochiTouch
 import com.coucou.android.ui.HistoryScreen
 import com.coucou.android.ui.SettingsScreen
@@ -191,7 +192,16 @@ class MainActivity : ComponentActivity() {
                             Screen.WARDROBE -> WardrobeScreen(model, onBack = { screen = Screen.SETTINGS })
                             Screen.DIAGNOSTICS -> DiagnosticsScreen(model, onBack = { screen = Screen.SETTINGS })
                             Screen.HISTORY -> HistoryScreen(model, onBack = { screen = Screen.SETTINGS })
-                            Screen.HOME -> if (model.mode == Mode.NONE) PairingScreen(model, onScan = { screen = Screen.SCAN }, onAbout = { screen = Screen.SETTINGS }) else Home(
+                            Screen.HOME -> if (model.mode == Mode.NONE) {
+                                if (model.assistantConfigured) AssistantHome(
+                                    model, onChat = { screen = Screen.CHAT },
+                                    onScan = { screen = Screen.SCAN },
+                                    onSettings = { screen = Screen.SETTINGS },
+                                ) else PairingScreen(
+                                    model, onScan = { screen = Screen.SCAN },
+                                    onAbout = { screen = Screen.SETTINGS },
+                                )
+                            } else Home(
                                 model, onApprove = ::approve, onOverlay = ::setOverlay,
                                 onSession = { detailPill = it; screen = Screen.SESSION },
                                 onScan = { screen = Screen.SCAN }, onReview = { closedApproval = null }, onQuestion = { questionPill = it },
