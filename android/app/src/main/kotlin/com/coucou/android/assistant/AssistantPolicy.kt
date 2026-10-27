@@ -6,8 +6,8 @@ import com.coucou.android.core.ChatStatus
 
 /** Model names are identifiers, never URLs. Network hosts are fixed by the transport. */
 enum class AssistantProvider(val id: String, val title: String, val defaultModel: String) {
-    GEMINI("gemini", "Google Gemini", "gemini-2.5-flash"),
-    NVIDIA("nvidia", "NVIDIA API", "meta/llama-3.1-8b-instruct");
+    GEMINI("gemini", "Google Gemini", "gemini-3.8-flash"),
+    NVIDIA("nvidia", "NVIDIA API", "nvidia/llama-3.3-nemotron-super-49b-v1");
 
     companion object {
         fun parse(value: String?): AssistantProvider =

@@ -31,6 +31,12 @@ class AssistantPolicyTest {
         assertEquals(listOf("u1", "a1", "u2"), AssistantPolicy.messageHistory(list).map { it.id })
     }
 
+    @Test fun eachDefaultProviderModelIsValid() {
+        for (provider in AssistantProvider.entries) {
+            assertTrue(AssistantPolicy.modelValid(provider.defaultModel))
+        }
+    }
+
     @Test fun providerIdsAreNamespacedAwayFromDesktopModels() {
         for (provider in AssistantProvider.entries) {
             assertEquals(provider, AssistantPolicy.fromLocalId(AssistantPolicy.localId(provider)))
