@@ -16,6 +16,13 @@ Real screenshots from a Galaxy A12s. The pairing, chat and approval screens are 
 |---|---|---|---|
 | <img src="../docs/media/android-home.jpg" width="180" alt="Home: Mochi, the agent list, plan usage and a service"> | <img src="../docs/media/android-island.jpg" width="180" alt="The island over the home screen while an agent works"> | <img src="../docs/media/android-lock-alert.jpg" width="180" alt="The lock screen: Approval needed, the command hidden"> | <img src="../docs/media/android-allow-deny.jpg" width="180" alt="A notification with Deny and Allow"> |
 
+## Independent phone AI (MyCouCoy fork)
+
+MyCouCoy can now use your own Gemini or NVIDIA API credentials for chat without a paired
+computer. Find **AI on this phone** in Android Settings, choose the provider, save a valid
+model ID and key, then open Chat. Desktop chat still works separately. See
+[PHONE_ASSISTANT.md](PHONE_ASSISTANT.md) for setup, security boundaries and limitations.
+
 ## Build and test
 
 Needs JDK 17 and the Android SDK (platform 35). From this folder:

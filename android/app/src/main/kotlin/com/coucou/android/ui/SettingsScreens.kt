@@ -219,6 +219,14 @@ fun SettingsScreen(model: AppModel, onHistory: () -> Unit, onGallery: () -> Unit
     ) {
         item { ScreenTitle(stringResource(R.string.settings_title), null) }
 
+        item {
+            SectionHeading(
+                if (AppLanguage.current(LocalContext.current).startsWith("es")) "IA en el teléfono"
+                else "AI on this phone",
+            )
+        }
+        item { AssistantSettingsCard(model) }
+
         item { SectionHeading(stringResource(R.string.settings_section_computer)) }
         item {
             Panel {

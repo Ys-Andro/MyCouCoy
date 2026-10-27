@@ -75,6 +75,12 @@ fun PairingScreen(model: AppModel, onScan: () -> Unit, onAbout: () -> Unit) {
             icon = { CoucouIcon(IconKind.SCAN, tint = t.onPrimaryButton.c(), size = 20.dp) },
         )
         Spacer(Modifier.size(Gap))
+        PillButton(
+            if (com.coucou.android.app.AppLanguage.current(androidx.compose.ui.platform.LocalContext.current).startsWith("es"))
+                "Usar IA en el teléfono" else "Use AI on this phone",
+            onAbout, Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.size(Gap))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Gap)) {
             PillButton(stringResource(R.string.pair_paste_short), { pasteOpen = true }, Modifier.weight(1f))
             PillButton(stringResource(R.string.demo_try), { model.startDemo() }, Modifier.weight(1f))

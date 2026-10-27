@@ -214,7 +214,7 @@ class MainActivity : ComponentActivity() {
                         val secure = SecureScreens.needed(
                             screen, pairing = model.mode == Mode.NONE, approvalSheetShown = pending != null && screen != Screen.SCAN,
                             questionSheetShown = questionPill != null, pairConfirmShown = model.pairRequest != null,
-                        )
+                        ) || screen == Screen.SETTINGS // API key editor: prevent screenshots and screen recording
                         SideEffect {
                             if (secure) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE) else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
                         }

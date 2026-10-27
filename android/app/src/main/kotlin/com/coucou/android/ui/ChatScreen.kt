@@ -80,6 +80,9 @@ import com.coucou.android.core.MarkdownLite
 import com.coucou.android.core.MdBlock
 import com.coucou.android.core.MdSpan
 import com.coucou.android.link.Protocol
+import com.coucou.android.assistant.AssistantPolicy
+import com.coucou.android.app.AppLanguage
+import androidx.compose.ui.platform.LocalContext
 
 /** The words for a code the computer (or this app) gives when an answer did not complete. */
 @Composable
@@ -138,7 +141,14 @@ private fun ChatEmpty(state: ChatTabState, onHome: () -> Unit, onSettings: () ->
                 style = TypeScale.BODY.style(t.textDim.c()).copy(textAlign = TextAlign.Center),
             )
             when (ChatTab.action(state)) {
-                Screen.HOME -> PillButton(stringResource(R.string.chat_go_pair), onHome, Modifier.fillMaxWidth(), PillKind.PRIMARY)
+                Screen.HOME -> {
+                    val spanish = AppLanguage.current(LocalContext.current).startsWith("es")
+                    PillButton(
+                        if (spanish) "Configurar IA en el teléfono" else "Set up AI on this phone",
+                        onSettings, Modifier.fillMaxWidth(), PillKind.PRIMARY,
+                    )
+                    TextButton(onClick = onHome) { Text(stringResource(R.string.chat_go_pair)) }
+                }
                 Screen.SETTINGS -> PillButton(stringResource(R.string.chat_go_settings), onSettings, Modifier.fillMaxWidth(), PillKind.PRIMARY)
                 else -> {}
             }
@@ -158,6 +168,14 @@ fun ChatScreen(model: AppModel, onHome: () -> Unit, onSettings: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val messages = model.chatMessages
+    val localMode = AssistantPolicy.fromLocalId(model.activeChatModel) != null
+    val spanish = AppLanguage.current(LocalContext.current).startsWith("es")
+    val assistantEngine = remember {
+        MochiEngine({ android.os.SystemClock.elapsedRealtimeNanos() / 1e6 })
+    }
+    LaunchedEffect(model.assistantState) {
+        assistantEngine.setState(model.assistantState, force = true)
+    }
 
     LaunchedEffect(Unit) { model.chatRefreshModels() }
     // Follow the answer as it grows.
@@ -196,10 +214,23 @@ fun ChatScreen(model: AppModel, onHome: () -> Unit, onSettings: () -> Unit) {
                 }
             },
         )
-        Text(
-            stringResource(R.string.chat_note), Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
-            style = TypeScale.SECONDARY.style(tokens().textDim.c()),
-        )
+        if (localMode) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                MochiView(assistantEngine, Modifier.size(34.dp))
+                Text(
+                    if (spanish) "IA directamente en este teléfono · Sin computadora"
+                    else "AI running from this phone · No computer required",
+                    modifier = Modifier.weight(1f),
+                    style = TypeScale.SECONDARY.style(tokens().textDim.c()),
+                )
+            }
+        } else {
+            Text(
+                stringResource(R.string.chat_note), Modifier.padding(horizontal = 4.dp, vertical = 4.dp),
+                style = TypeScale.SECONDARY.style(tokens().textDim.c()),
+            )
+        }
         if (!model.chatAvailable) {
             // The conversation stays readable; the reason sits above it.
             Panel(Modifier.padding(vertical = 4.dp)) {
@@ -376,8 +407,8 @@ private fun Composer(model: AppModel, text: String, refusal: ChatSession.Refusal
 @Composable
 private fun ModelChip(model: AppModel) {
     var open by remember { mutableStateOf(false) }
-    val models = model.chatModels
-    val current = models.firstOrNull { it.id == model.chatModel }
+    val models = model.availableChatModels
+    val current = models.firstOrNull { it.id == model.activeChatModel }
     val t = tokens()
     Box {
         Row(

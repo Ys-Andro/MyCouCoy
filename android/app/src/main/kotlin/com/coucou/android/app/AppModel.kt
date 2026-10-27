@@ -59,6 +59,11 @@ import com.coucou.android.link.Wake
 import com.coucou.android.link.SessionInfo
 import com.coucou.android.sound.SoundPlayer
 import com.coucou.android.mochi.BotState
+import com.coucou.android.assistant.AssistantPolicy
+import com.coucou.android.assistant.AssistantProvider
+import com.coucou.android.assistant.AssistantPreferences
+import com.coucou.android.assistant.CloudAssistant
+import com.coucou.android.core.IslandSpec
 
 enum class Mode { NONE, DEMO, PAIRED }
 
@@ -66,6 +71,8 @@ enum class Mode { NONE, DEMO, PAIRED }
 class AppModel(private val context: Context) : LinkListener {
     private val main = Handler(Looper.getMainLooper())
     private val store = SecureStore(context)
+    private val assistantPrefs = AssistantPreferences(context)
+    private val phoneAi = CloudAssistant()
     val sounds = SoundPlayer(context)
     val notifier = Notifications(context)
 
@@ -229,6 +236,61 @@ class AppModel(private val context: Context) : LinkListener {
 
     var chatModel by mutableStateOf<String?>(prefs.getString("chat_model", null)); private set
 
+    /** Native AI runs directly on this phone, even without a paired desktop. */
+    var assistantProvider by mutableStateOf(assistantPrefs.provider); private set
+    var assistantModel by mutableStateOf(assistantPrefs.model()); private set
+    var assistantConfigured by mutableStateOf(assistantPrefs.hasKey()); private set
+    var assistantState by mutableStateOf(BotState.IDLE); private set
+    private var phoneChatId: String? = null
+
+    val availableChatModels: List<ChatModel>
+        get() = (if (assistantConfigured) listOf(
+            ChatModel(AssistantPolicy.localId(assistantProvider), "phone", "Coucou AI · " + assistantProvider.title + " / " + assistantModel)
+        ) else emptyList()) + chatModels
+
+    val activeChatModel: String?
+        get() = availableChatModels.firstOrNull { it.id == chatModel }?.id
+            ?: availableChatModels.firstOrNull()?.id
+
+    fun selectAssistantProvider(provider: AssistantProvider) {
+        if (provider == assistantProvider) return
+        cancelPhoneChat()
+        assistantPrefs.setProvider(provider)
+        assistantProvider = provider
+        assistantModel = assistantPrefs.model(provider)
+        assistantConfigured = assistantPrefs.hasKey(provider)
+        if (assistantConfigured) chatSelect(AssistantPolicy.localId(provider))
+    }
+
+    fun setAssistantModel(value: String): Boolean {
+        if (!assistantPrefs.setModel(assistantProvider, value)) return false
+        assistantModel = assistantPrefs.model()
+        return true
+    }
+
+    fun saveAssistantKey(input: String): Boolean {
+        val saved = assistantPrefs.setKey(assistantProvider, input)
+        assistantConfigured = assistantPrefs.hasKey()
+        if (saved) chatSelect(AssistantPolicy.localId(assistantProvider))
+        return saved
+    }
+
+    fun clearAssistantKey() {
+        cancelPhoneChat()
+        assistantPrefs.clearKey(assistantProvider)
+        assistantConfigured = false
+    }
+
+    private fun cancelPhoneChat() {
+        if (phoneChatId == null) return
+        phoneAi.cancel()
+        phoneChatId = null
+        chatSession.cancel()
+        chatChanged(save = true)
+        assistantState = BotState.IDLE
+        refreshIsland()
+    }
+
     /** The computer offers session details (steps, last message, project folder, colour) to this phone. */
     var detailsOffered by mutableStateOf(false); private set
     /** The computer lists the files an agent changed and can send their lines (its switch is on). */
@@ -242,12 +304,18 @@ class AppModel(private val context: Context) : LinkListener {
     var services by mutableStateOf<List<com.coucou.android.link.ServiceCard>>(emptyList()); private set
 
     /** What the Chat tab shows: not paired, not reachable, chat off on the computer, no model allowed, or ready. */
-    val chatTabState: ChatTabState get() = ChatTab.state(
-        paired = mode == Mode.PAIRED, connected = linkState == LinkState.CONNECTED, offered = chatOffered, modelCount = chatModels.size,
-    )
+    val chatTabState: ChatTabState get() =
+        if (assistantConfigured) ChatTabState.READY else ChatTab.state(
+            paired = mode == Mode.PAIRED, connected = linkState == LinkState.CONNECTED,
+            offered = chatOffered, modelCount = chatModels.size,
+        )
 
-    /** Chat is usable: offered, at least one model allowed, connected. */
-    val chatAvailable: Boolean get() = chatOffered && chatModels.isNotEmpty() && linkState == LinkState.CONNECTED
+    /** Native chat does not require any desktop; remote models still require the link. */
+    val chatAvailable: Boolean get() {
+        val id = activeChatModel ?: return false
+        return if (AssistantPolicy.fromLocalId(id) != null) assistantConfigured
+        else chatOffered && linkState == LinkState.CONNECTED && chatModels.any { it.id == id }
+    }
 
     private fun chatChanged(save: Boolean) {
         chatMessages = chatSession.messages
@@ -256,7 +324,7 @@ class AppModel(private val context: Context) : LinkListener {
     }
 
     fun chatSelect(id: String) {
-        if (chatModels.any { it.id == id }) {
+        if (availableChatModels.any { it.id == id }) {
             chatModel = id
             prefs.edit().putString("chat_model", id).apply()
         }
@@ -265,14 +333,52 @@ class AppModel(private val context: Context) : LinkListener {
     /** Asks the computer again which models are allowed (when the Chat screen opens). */
     fun chatRefreshModels() { link?.chatModels() }
 
-    /** Null when sent, else why not (for a message under the box). */
+    /** Native AI or desktop chat, depending on the selected model. */
     fun chatSend(text: String): ChatSession.Refusal? {
-        val sent = chatSession.send(text, chatModel, connected = chatAvailable)
+        val selected = activeChatModel
+        val local = AssistantPolicy.fromLocalId(selected)
+        val sent = chatSession.send(text, selected, connected = chatAvailable)
         return when (sent) {
             is ChatSession.Sent.No -> sent.why
             is ChatSession.Sent.Ok -> {
                 chatChanged(save = true)
-                if (link?.chatSend(sent.msg.id, sent.msg.model, sent.msg.text) != true) {
+                if (local != null) {
+                    val request = assistantPrefs.request()?.takeIf { it.provider == local }
+                        ?.copy(history = AssistantPolicy.messageHistory(chatSession.messages))
+                    if (request == null) {
+                        chatSession.onError(sent.msg.id, "no_key")
+                        chatChanged(save = true)
+                    } else {
+                        val id = sent.msg.id
+                        phoneChatId = id
+                        assistantState = BotState.THINKING
+                        refreshIsland()
+                        phoneAi.send(
+                            request,
+                            onDelta = { chunk -> chatSession.onDelta(id, chunk); chatChanged(save = false) },
+                            onDone = {
+                                chatSession.onDone(id, null)
+                                phoneChatId = null
+                                chatChanged(save = true)
+                                assistantState = BotState.FINISHED
+                                refreshIsland()
+                                if (islandAllowed()) {
+                                    overlay.flash(IslandSpec(
+                                        IslandSpec.Kind.FINISHED, "phone-ai", "Coucou AI",
+                                        BotState.FINISHED, "Respuesta terminada",
+                                    ))
+                                }
+                            },
+                            onError = { reason ->
+                                chatSession.onError(id, reason)
+                                phoneChatId = null
+                                chatChanged(save = true)
+                                assistantState = BotState.ERROR
+                                refreshIsland()
+                            },
+                        )
+                    }
+                } else if (link?.chatSend(sent.msg.id, sent.msg.model, sent.msg.text) != true) {
                     chatSession.onDisconnected()
                     chatChanged(save = true)
                 }
@@ -282,13 +388,20 @@ class AppModel(private val context: Context) : LinkListener {
     }
 
     fun chatCancel() {
-        chatSession.cancel()?.let { link?.chatCancel(it) }
+        val id = chatSession.running
+        if (id != null && id == phoneChatId) {
+            phoneAi.cancel()
+            phoneChatId = null
+            assistantState = BotState.IDLE
+            refreshIsland()
+        } else if (id != null) link?.chatCancel(id)
+        chatSession.cancel()
         chatChanged(save = true)
     }
 
-    /** Clear: forgets the history here and on the computer. */
+    /** Clear local history; the desktop's temporary conversation is cleared separately. */
     fun chatClear() {
-        chatSession.cancel()?.let { link?.chatCancel(it) }
+        chatCancel()
         chatSession.clear()
         chatHistory.clear()
         link?.chatReset()
@@ -299,7 +412,7 @@ class AppModel(private val context: Context) : LinkListener {
         detailsOffered = false
         chatOffered = false
         chatModels = emptyList()
-        if (chatSession.running != null) {
+        if (chatSession.running != null && phoneChatId == null) {
             chatSession.onDisconnected()
             chatChanged(save = true)
         }
@@ -387,7 +500,12 @@ class AppModel(private val context: Context) : LinkListener {
             overlay.hide()
             return
         }
-        overlay.setActive(IslandPlan.active(sessions, approvals, allowed = true, this::agentName))
+        val remote = IslandPlan.active(sessions, approvals, allowed = true, this::agentName)
+        val phone = if (phoneChatId != null) IslandSpec(
+            IslandSpec.Kind.WORKING, "phone-ai", "Coucou AI", BotState.THINKING,
+            "Preparando una respuesta",
+        ) else null
+        overlay.setActive(remote ?: phone)
     }
 
     /**
@@ -744,7 +862,7 @@ class AppModel(private val context: Context) : LinkListener {
     override fun onChatModels(models: List<ChatModel>) {
         main.post {
             chatModels = models
-            chatModel = ChatModels.pick(models, chatModel)
+            if (chatModel == null) chatModel = ChatModels.pick(availableChatModels, null)
         }
     }
 
