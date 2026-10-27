@@ -17,7 +17,7 @@ import com.coucou.android.core.ChatRole
  * redirect, proxy, telemetry or Android UI work on the network thread.
  * SSE is read incrementally, with callbacks delivered on the main thread.
  */
-class CloudAssistant {
+class CloudAssistant : AssistantTransport {
     private val main = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "coucou-phone-ai").apply { isDaemon = true }
@@ -26,13 +26,13 @@ class CloudAssistant {
     @Volatile private var current: HttpURLConnection? = null
     @Volatile private var future: Future<*>? = null
 
-    fun cancel() {
+    override fun cancel() {
         generation.incrementAndGet()
         future?.cancel(true)
         current?.disconnect()
     }
 
-    fun send(
+    override fun send(
         request: AssistantRequest,
         onDelta: (String) -> Unit,
         onDone: () -> Unit,

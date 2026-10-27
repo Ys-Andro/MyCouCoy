@@ -91,7 +91,6 @@ import com.coucou.android.core.MarkdownLite
 import com.coucou.android.core.MdBlock
 import com.coucou.android.core.MdSpan
 import com.coucou.android.link.Protocol
-import com.coucou.android.assistant.AssistantPolicy
 import androidx.compose.ui.platform.LocalContext
 
 /** Local errors are about the phone's connection, not Coucou Desktop. */
@@ -206,7 +205,7 @@ fun ChatScreen(model: AppModel, onHome: () -> Unit, onSettings: () -> Unit) {
     var confirmClear by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
     val messages = model.chatMessages
-    val localMode = AssistantPolicy.fromLocalId(model.activeChatModel) != null
+    val localMode = model.activeChatDestination == com.coucou.android.core.ChatRouting.Destination.PHONE
     val context = LocalContext.current
     val spanish = assistantSpanish()
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -491,7 +490,7 @@ private fun Composer(model: AppModel, text: String, refusal: ChatSession.Refusal
             refusal == ChatSession.Refusal.NO_MODEL -> stringResource(R.string.chat_ref_no_model)
             refusal == ChatSession.Refusal.BUSY -> stringResource(R.string.chat_ref_busy)
             refusal == ChatSession.Refusal.OFFLINE &&
-                AssistantPolicy.fromLocalId(model.activeChatModel) != null ->
+                model.activeChatDestination == com.coucou.android.core.ChatRouting.Destination.PHONE ->
                 if (assistantSpanish()) "Sin Internet en el teléfono. Reconecta e inténtalo otra vez."
                 else "The phone has no Internet. Reconnect and try again."
             refusal == ChatSession.Refusal.OFFLINE -> stringResource(R.string.chat_ref_offline)
