@@ -54,13 +54,24 @@ on pushes to `main`, **provided GitHub Actions is enabled for the fork**.
 - Verify that legacy desktop pairing, approvals, session listings and the demo
   continue to operate normally.
 
-## Verification limitations
+## Automated verification (GitHub Actions)
 
-Changes were reviewed statically via the GitHub repository. The assistant runtime
-used for this edit has no Android SDK or Gradle cache and cannot reach GitHub via
-its shell network, so an Android APK build, tests and device run **have not been
-executed here**. A merge to `main` is not evidence of a passing build. GitHub
-Actions had zero runs for this fork at the time of review. Do not declare Phase 1
-fully validated until the build and acceptance checks pass.
+**PASS**: The Android workflow on commit `c9ac988fecf45195e6ebc2c7d0d3995d35c96002`
+successfully completed `./gradlew test assembleDebug lint --console=plain` on
+GitHub-hosted Ubuntu, using Java 17 and Android SDK tooling. This included
+compilation of debug and release Kotlin, the debug APK, the debug/release
+unit test suites, release verification, lint and the forbidden-dependency
+check. Gradle reported **BUILD SUCCESSFUL** with 103 tasks executed.
 
-No real API credentials were inserted into the repository.
+Run: https://github.com/Ys-Andro/MyCouCoy/actions/runs/40435943015
+
+Two intermediate iterations of the stability patch found and resolved an
+unresolved Kotlin import and two outdated source-based UI assertions.
+The final tested source passed. The separate phone-link workflow's Android,
+Windows and relay jobs also completed successfully on the same commit;
+longer interop/E2E jobs may have separate completion times.
+
+**Remaining manual gate:** There has been no on-device interaction, battery,
+Android overlay, speech engine or provider-key test in this session.
+Run the acceptance checks above on a real phone before declaring the
+entire phase device-verified. No API credential was put in Git.
