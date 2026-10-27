@@ -28,6 +28,9 @@ is not required for phone models.
   entering a key. Key text isn't saved in Activity state and stored keys are never displayed.
 - Chat history continues to use the existing **app-private, local** conversation file.
   Clear history from Chat to remove it.
+- Each phone provider gets its own **in-memory** conversation context. Switching between
+  Gemini, NVIDIA and desktop does not automatically send previous providers' turns to a
+  newly chosen API. The visible local transcript may still show all the messages.
 - The user must obtain and manage their own provider keys and quota. Model IDs are editable.
 
 ## Architecture
@@ -36,6 +39,7 @@ is not required for phone models.
   bounded conversation context.
 - `assistant/AssistantPreferences.kt`: private settings and Keystore encrypted credentials.
 - `assistant/CloudAssistant.kt`: cancellable HTTPS/SSE streaming; no UI/network blocking.
+- `assistant/ProviderHistory.kt`: provider-isolated context for privacy.
 - `app/AppModel.kt`: local/desktop routing and lifecycle; local traffic does not use LinkClient.
 - `ui/AssistantSettings.kt`: editable model and non-persistent secret editor.
 - `ui/ChatScreen.kt`: native AI feedback, mixed model selector, optional speech dictation and TTS.

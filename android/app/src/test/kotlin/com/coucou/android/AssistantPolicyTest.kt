@@ -2,6 +2,7 @@ package com.coucou.android
 
 import com.coucou.android.assistant.AssistantPolicy
 import com.coucou.android.assistant.AssistantProvider
+import com.coucou.android.assistant.ProviderHistory
 import com.coucou.android.core.ChatMessage
 import com.coucou.android.core.ChatRole
 import com.coucou.android.core.ChatStatus
@@ -35,6 +36,22 @@ class AssistantPolicyTest {
         for (provider in AssistantProvider.entries) {
             assertTrue(AssistantPolicy.modelValid(provider.defaultModel))
         }
+    }
+
+    @Test fun providersDoNotShareConversationContext() {
+        val history = ProviderHistory()
+        val google = AssistantProvider.GEMINI
+        val nvidia = AssistantProvider.NVIDIA
+        val question = ChatMessage("q1", ChatRole.USER, "private first prompt")
+        val answer = ChatMessage("a1", ChatRole.ASSISTANT, "private first answer")
+        history.completed(google, question, answer)
+
+        val second = ChatMessage("q2", ChatRole.USER, "second provider")
+        assertEquals(listOf("q2"), history.forRequest(nvidia, second).map { it.id })
+        assertEquals(listOf("q1", "a1", "q2"), history.forRequest(google, second).map { it.id })
+
+        history.clear()
+        assertEquals(listOf("q2"), history.forRequest(google, second).map { it.id })
     }
 
     @Test fun providerIdsAreNamespacedAwayFromDesktopModels() {

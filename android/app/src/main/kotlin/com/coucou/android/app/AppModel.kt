@@ -63,6 +63,7 @@ import com.coucou.android.assistant.AssistantPolicy
 import com.coucou.android.assistant.AssistantProvider
 import com.coucou.android.assistant.AssistantPreferences
 import com.coucou.android.assistant.CloudAssistant
+import com.coucou.android.assistant.ProviderHistory
 import com.coucou.android.core.IslandSpec
 
 enum class Mode { NONE, DEMO, PAIRED }
@@ -73,6 +74,7 @@ class AppModel(private val context: Context) : LinkListener {
     private val store = SecureStore(context)
     private val assistantPrefs = AssistantPreferences(context)
     private val phoneAi = CloudAssistant()
+    private val providerHistory = ProviderHistory()
     val sounds = SoundPlayer(context)
     val notifier = Notifications(context)
 
@@ -343,8 +345,9 @@ class AppModel(private val context: Context) : LinkListener {
             is ChatSession.Sent.Ok -> {
                 chatChanged(save = true)
                 if (local != null) {
-                    val request = assistantPrefs.request()?.takeIf { it.provider == local }
-                        ?.copy(history = AssistantPolicy.messageHistory(chatSession.messages))
+                    val userTurn = chatSession.messages.lastOrNull { it.id == "u-" + sent.msg.id }
+                    val request = assistantPrefs.request()?.takeIf { it.provider == local && userTurn != null }
+                        ?.copy(history = providerHistory.forRequest(local, userTurn!!))
                     if (request == null) {
                         chatSession.onError(sent.msg.id, "no_key")
                         chatChanged(save = true)
@@ -358,6 +361,10 @@ class AppModel(private val context: Context) : LinkListener {
                             onDelta = { chunk -> chatSession.onDelta(id, chunk); chatChanged(save = false) },
                             onDone = {
                                 chatSession.onDone(id, null)
+                                val response = chatSession.messages.lastOrNull { it.id == id }
+                                if (userTurn != null && response != null) {
+                                    providerHistory.completed(local, userTurn, response)
+                                }
                                 phoneChatId = null
                                 chatChanged(save = true)
                                 assistantState = BotState.FINISHED
@@ -403,6 +410,7 @@ class AppModel(private val context: Context) : LinkListener {
     fun chatClear() {
         chatCancel()
         chatSession.clear()
+        providerHistory.clear()
         chatHistory.clear()
         link?.chatReset()
         chatChanged(save = false)
