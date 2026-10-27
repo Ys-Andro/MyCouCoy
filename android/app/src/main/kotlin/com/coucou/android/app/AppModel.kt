@@ -29,6 +29,7 @@ import com.coucou.android.core.PairingScan
 import com.coucou.android.core.ScanDecision
 import com.coucou.android.core.ChatHistory
 import com.coucou.android.core.ChatRouting
+import com.coucou.android.core.ChatModels
 import com.coucou.android.core.ChatSession
 import com.coucou.android.link.AddressFinder
 import com.coucou.android.link.ApprovalRequest
