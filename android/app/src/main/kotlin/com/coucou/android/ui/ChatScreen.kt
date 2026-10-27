@@ -150,7 +150,7 @@ private fun ChatEmpty(state: ChatTabState, onHome: () -> Unit, onSettings: () ->
             )
             when (ChatTab.action(state)) {
                 Screen.HOME -> {
-                    val spanish = AppLanguage.current(LocalContext.current).startsWith("es")
+                    val spanish = assistantSpanish()
                     PillButton(
                         if (spanish) "Configurar IA en el teléfono" else "Set up AI on this phone",
                         onSettings, Modifier.fillMaxWidth(), PillKind.PRIMARY,
