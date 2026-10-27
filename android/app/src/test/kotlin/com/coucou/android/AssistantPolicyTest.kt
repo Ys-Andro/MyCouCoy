@@ -34,8 +34,15 @@ class AssistantPolicyTest {
 
     @Test fun eachDefaultProviderModelIsValid() {
         for (provider in AssistantProvider.entries) {
-            assertTrue(AssistantPolicy.modelValid(provider.defaultModel))
+            assertTrue(AssistantPolicy.modelValid(provider, provider.defaultModel))
         }
+    }
+
+    @Test fun geminiModelCannotEscapeTheModelsEndpoint() {
+        assertTrue(AssistantPolicy.modelValid(AssistantProvider.GEMINI, "gemini-3.8-flash"))
+        assertFalse(AssistantPolicy.modelValid(AssistantProvider.GEMINI, "gemini-3.8-flash/v1"))
+        assertFalse(AssistantPolicy.modelValid(AssistantProvider.GEMINI, "gemini-3.8-flash:generateContent"))
+        assertTrue(AssistantPolicy.modelValid(AssistantProvider.NVIDIA, "nvidia/nemotron-3.5-lightning-30b-a3b"))
     }
 
     @Test fun providersDoNotShareConversationContext() {

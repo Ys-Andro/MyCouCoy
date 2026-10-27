@@ -27,11 +27,11 @@ class AssistantPreferences(context: Context) {
 
     fun model(provider: AssistantProvider = this.provider): String =
         prefs.getString("model_" + provider.id, provider.defaultModel)
-            ?.takeIf(AssistantPolicy::modelValid) ?: provider.defaultModel
+            ?.takeIf { AssistantPolicy.modelValid(provider, it) } ?: provider.defaultModel
 
     fun setModel(provider: AssistantProvider, value: String): Boolean {
         val candidate = value.trim()
-        if (!AssistantPolicy.modelValid(candidate)) return false
+        if (!AssistantPolicy.modelValid(provider, candidate)) return false
         prefs.edit().putString("model_" + provider.id, candidate).apply()
         return true
     }

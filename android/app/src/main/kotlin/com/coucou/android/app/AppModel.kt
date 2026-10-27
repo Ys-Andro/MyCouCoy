@@ -244,6 +244,7 @@ class AppModel(private val context: Context) : LinkListener {
     var assistantConfigured by mutableStateOf(assistantPrefs.hasKey()); private set
     var assistantState by mutableStateOf(BotState.IDLE); private set
     private var phoneChatId: String? = null
+    private val resetAssistantState = Runnable { assistantState = BotState.IDLE }
 
     val availableChatModels: List<ChatModel>
         get() = (if (assistantConfigured) listOf(
@@ -284,6 +285,7 @@ class AppModel(private val context: Context) : LinkListener {
     }
 
     private fun cancelPhoneChat() {
+        main.removeCallbacks(resetAssistantState)
         if (phoneChatId == null) return
         phoneAi.cancel()
         phoneChatId = null
@@ -354,6 +356,7 @@ class AppModel(private val context: Context) : LinkListener {
                     } else {
                         val id = sent.msg.id
                         phoneChatId = id
+                        main.removeCallbacks(resetAssistantState)
                         assistantState = BotState.THINKING
                         refreshIsland()
                         phoneAi.send(
@@ -368,6 +371,8 @@ class AppModel(private val context: Context) : LinkListener {
                                 phoneChatId = null
                                 chatChanged(save = true)
                                 assistantState = BotState.FINISHED
+                                main.removeCallbacks(resetAssistantState)
+                                main.postDelayed(resetAssistantState, 5_000L)
                                 refreshIsland()
                                 if (islandAllowed()) {
                                     overlay.flash(IslandSpec(
@@ -381,6 +386,8 @@ class AppModel(private val context: Context) : LinkListener {
                                 phoneChatId = null
                                 chatChanged(save = true)
                                 assistantState = BotState.ERROR
+                                main.removeCallbacks(resetAssistantState)
+                                main.postDelayed(resetAssistantState, 5_000L)
                                 refreshIsland()
                             },
                         )
@@ -399,6 +406,7 @@ class AppModel(private val context: Context) : LinkListener {
         if (id != null && id == phoneChatId) {
             phoneAi.cancel()
             phoneChatId = null
+            main.removeCallbacks(resetAssistantState)
             assistantState = BotState.IDLE
             refreshIsland()
         } else if (id != null) link?.chatCancel(id)
@@ -473,9 +481,8 @@ class AppModel(private val context: Context) : LinkListener {
     }
 
     private fun islandAllowed(): Boolean {
-        val connected = mode != Mode.PAIRED || linkState == LinkState.CONNECTED
+        // The phone's own assistant must not depend on the optional desktop link.
         val why = OverlayPolicy.blocker(choice.wished, overlay.permitted(), inForeground)
-            ?: if (!connected) "not connected to a computer" else null
         if (why != null) Log.d("CoucouOverlay", "no island: $why")
         return why == null
     }
@@ -508,7 +515,8 @@ class AppModel(private val context: Context) : LinkListener {
             overlay.hide()
             return
         }
-        val remote = IslandPlan.active(sessions, approvals, allowed = true, this::agentName)
+        val remoteSessions = if (mode == Mode.PAIRED && linkState != LinkState.CONNECTED) emptyList() else sessions
+        val remote = IslandPlan.active(remoteSessions, approvals, allowed = true, this::agentName)
         val phone = if (phoneChatId != null) IslandSpec(
             IslandSpec.Kind.WORKING, "phone-ai", "Coucou AI", BotState.THINKING,
             "Preparando una respuesta",

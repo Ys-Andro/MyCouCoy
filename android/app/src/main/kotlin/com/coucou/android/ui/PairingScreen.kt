@@ -76,7 +76,7 @@ fun PairingScreen(model: AppModel, onScan: () -> Unit, onAbout: () -> Unit) {
         )
         Spacer(Modifier.size(Gap))
         PillButton(
-            if (com.coucou.android.app.AppLanguage.current(androidx.compose.ui.platform.LocalContext.current).startsWith("es"))
+            if (assistantSpanish())
                 "Usar IA en el teléfono" else "Use AI on this phone",
             onAbout, Modifier.fillMaxWidth(),
         )

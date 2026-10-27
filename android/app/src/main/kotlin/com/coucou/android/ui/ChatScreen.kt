@@ -90,7 +90,6 @@ import com.coucou.android.core.MdBlock
 import com.coucou.android.core.MdSpan
 import com.coucou.android.link.Protocol
 import com.coucou.android.assistant.AssistantPolicy
-import com.coucou.android.app.AppLanguage
 import androidx.compose.ui.platform.LocalContext
 
 /** The words for a code the computer (or this app) gives when an answer did not complete. */
@@ -179,7 +178,7 @@ fun ChatScreen(model: AppModel, onHome: () -> Unit, onSettings: () -> Unit) {
     val messages = model.chatMessages
     val localMode = AssistantPolicy.fromLocalId(model.activeChatModel) != null
     val context = LocalContext.current
-    val spanish = AppLanguage.current(context).startsWith("es")
+    val spanish = assistantSpanish()
     val voiceLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             val phrase = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()

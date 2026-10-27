@@ -4,7 +4,6 @@ import android.os.Handler
 import android.os.Looper
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.BufferedReader
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -100,26 +99,35 @@ class CloudAssistant {
                 400, 404, 422 -> "provider"
                 else -> "unreachable"
             })
-            var hasText = false
+            var deliveredChars = 0
+            val frames = SseFrames()
+            fun consume(frame: String?) {
+                if (frame.isNullOrBlank() || frame == "[DONE]") return
+                val data = try { JSONObject(frame) } catch (_: Exception) { return }
+                if (data.optJSONObject("error") != null) throw CloudFailure("provider")
+                val part = when (request.provider) {
+                    AssistantProvider.GEMINI -> geminiText(data)
+                    AssistantProvider.NVIDIA -> nvidiaText(data)
+                } ?: return
+                // Match ChatSession's limit before posting anything to the UI.
+                val remaining = 40_000 - deliveredChars
+                if (remaining > 0) {
+                    val chunk = part.take(remaining)
+                    if (chunk.isNotEmpty()) {
+                        deliveredChars += chunk.length
+                        emit(chunk)
+                    }
+                }
+            }
             conn.inputStream.bufferedReader(Charsets.UTF_8).use { reader ->
                 while (true) {
                     if (Thread.currentThread().isInterrupted) throw IOException("cancelled")
                     val line = reader.readLine() ?: break
-                    if (!line.startsWith("data:")) continue
-                    val raw = line.substringAfter("data:").trim()
-                    if (raw.isEmpty() || raw == "[DONE]") continue
-                    val data = try { JSONObject(raw) } catch (_: Exception) { continue }
-                    val part = when (request.provider) {
-                        AssistantProvider.GEMINI -> geminiText(data)
-                        AssistantProvider.NVIDIA -> nvidiaText(data)
-                    }
-                    if (!part.isNullOrEmpty()) {
-                        hasText = true
-                        emit(part)
-                    }
+                    consume(frames.feed(line))
                 }
+                consume(frames.finish())
             }
-            return hasText
+            return deliveredChars > 0
         } finally {
             conn.disconnect()
         }

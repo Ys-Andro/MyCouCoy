@@ -7,7 +7,7 @@ import com.coucou.android.core.ChatStatus
 /** Model names are identifiers, never URLs. Network hosts are fixed by the transport. */
 enum class AssistantProvider(val id: String, val title: String, val defaultModel: String) {
     GEMINI("gemini", "Google Gemini", "gemini-3.8-flash"),
-    NVIDIA("nvidia", "NVIDIA API", "nvidia/llama-3.3-nemotron-super-49b-v1");
+    NVIDIA("nvidia", "NVIDIA API", "nvidia/nemotron-3.5-lightning-30b-a3b");
 
     companion object {
         fun parse(value: String?): AssistantProvider =
@@ -31,6 +31,10 @@ object AssistantPolicy {
     fun modelValid(value: String): Boolean =
         value.length <= MAX_MODEL_LENGTH && MODEL_PATTERN.matches(value) &&
             !value.contains("://") && !value.contains("..")
+
+    /** Provider-specific validation: Gemini models are a single path segment. */
+    fun modelValid(provider: AssistantProvider, value: String): Boolean =
+        modelValid(value) && (provider != AssistantProvider.GEMINI || ("/" !in value && ":" !in value))
 
     fun messageHistory(all: List<ChatMessage>): List<ChatMessage> =
         all.filter { message ->

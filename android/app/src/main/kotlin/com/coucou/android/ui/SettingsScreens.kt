@@ -221,7 +221,7 @@ fun SettingsScreen(model: AppModel, onHistory: () -> Unit, onGallery: () -> Unit
 
         item {
             SectionHeading(
-                if (AppLanguage.current(LocalContext.current).startsWith("es")) "IA en el teléfono"
+                if (assistantSpanish()) "IA en el teléfono"
                 else "AI on this phone",
             )
         }

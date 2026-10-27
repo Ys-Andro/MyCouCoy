@@ -19,10 +19,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.coucou.android.app.AppLanguage
 import com.coucou.android.app.AppModel
 import com.coucou.android.core.TypeScale
 import com.coucou.android.mochi.MochiEngine
@@ -40,7 +38,7 @@ fun AssistantHome(model: AppModel, onChat: () -> Unit, onScan: () -> Unit, onSet
         return
     }
 
-    val spanish = AppLanguage.current(LocalContext.current).startsWith("es")
+    val spanish = assistantSpanish()
     val t = tokens()
     val engine = remember {
         MochiEngine({ SystemClock.elapsedRealtimeNanos() / 1e6 })

@@ -16,12 +16,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.coucou.android.app.AppLanguage
 import com.coucou.android.app.AppModel
 import com.coucou.android.assistant.AssistantProvider
 import com.coucou.android.core.TypeScale
@@ -32,7 +30,7 @@ import com.coucou.android.core.TypeScale
  */
 @Composable
 fun AssistantSettingsCard(model: AppModel) {
-    val es = AppLanguage.current(LocalContext.current).startsWith("es")
+    val es = assistantSpanish()
     val t = tokens()
     var modelDraft by remember(model.assistantProvider) { mutableStateOf(model.assistantModel) }
     var keyDraft by remember(model.assistantProvider) { mutableStateOf("") }
