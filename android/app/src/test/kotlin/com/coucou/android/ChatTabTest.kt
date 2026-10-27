@@ -116,7 +116,10 @@ class ChatTabSourceTest {
     }
 
     @Test fun theModelStatePicksTheScreen() {
-        assertTrue(src("app/AppModel.kt").contains("val chatTabState: ChatTabState get() = ChatTab.state("))
+        val model = src("app/AppModel.kt")
+        assertTrue(model.contains("val chatTabState: ChatTabState get()"))
+        assertTrue("phone AI can be ready without pairing", model.contains("if (assistantConfigured) ChatTabState.READY"))
+        assertTrue("desktop status must still use its original policy", model.contains("else ChatTab.state("))
     }
 
     @Test fun homeNoLongerHasAChatEntryAndThereIsNoUnreadDotToKeep() {

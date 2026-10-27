@@ -96,6 +96,9 @@ class ScanScreenTest {
         assertTrue("paste lives in a sheet, with the clipboard shortcut", ui.contains("PasteSheet(") && ui.contains("R.string.pair_clipboard"))
         // a pasted link is checked by the same parser before anything is paired
         assertTrue(ui.contains("if (PairingPayload.parse(link) != null) { model.pair(link)"))
-        assertTrue(src("MainActivity.kt").contains("if (model.mode == Mode.NONE) PairingScreen("))
+        val main = src("MainActivity.kt")
+        assertTrue(main.contains("if (model.mode == Mode.NONE) {"))
+        assertTrue("native assistant is the first choice once configured", main.contains("if (model.assistantConfigured) AssistantHome("))
+        assertTrue("the original QR/paste pairing screen remains accessible", main.contains("else PairingScreen("))
     }
 }
