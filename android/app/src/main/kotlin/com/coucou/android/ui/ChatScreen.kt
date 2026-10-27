@@ -31,6 +31,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import com.coucou.android.core.IconKind
@@ -92,6 +94,27 @@ import com.coucou.android.link.Protocol
 import com.coucou.android.assistant.AssistantPolicy
 import androidx.compose.ui.platform.LocalContext
 
+/** Local errors are about the phone's connection, not Coucou Desktop. */
+@Composable
+private fun visibleChatError(code: String?): String {
+    val es = assistantSpanish()
+    return when (code) {
+        "phone_offline" -> if (es) "Sin conexión a Internet. Reconecta el teléfono e inténtalo de nuevo."
+            else "No Internet connection. Reconnect your phone and try again."
+        "phone_unreachable" -> if (es) "No se pudo conectar con el proveedor de IA. Comprueba Internet y vuelve a intentarlo."
+            else "Could not reach the AI provider. Check your Internet connection and retry."
+        "phone_auth" -> if (es) "El proveedor rechazó la clave API del teléfono. Revísala en Ajustes."
+            else "The provider rejected the phone's API key. Check it in Settings."
+        "phone_provider" -> if (es) "El proveedor devolvió un error. Revisa el modelo y vuelve a intentarlo."
+            else "The provider returned an error. Check the model and retry."
+        "phone_rate" -> if (es) "Has alcanzado el límite de solicitudes. Inténtalo más tarde."
+            else "The request limit has been reached. Try again later."
+        "phone_no_key" -> if (es) "Debes configurar una clave API en Ajustes."
+            else "Set up an API key in Settings."
+        else -> reasonText(code)
+    }
+}
+
 /** The words for a code the computer (or this app) gives when an answer did not complete. */
 @Composable
 private fun reasonText(code: String?): String = stringResource(
@@ -141,11 +164,18 @@ private fun ChatEmpty(state: ChatTabState, onHome: () -> Unit, onSettings: () ->
         ) {
             MochiView(engine, Modifier.size(120.dp))
             Text(
-                stringResource(chatStateTitle(state)), Modifier.padding(top = 16.dp),
+                if (state == ChatTabState.NOT_PAIRED) {
+                    if (assistantSpanish()) "Configura tu IA en el teléfono" else "Set up AI on your phone"
+                } else stringResource(chatStateTitle(state)),
+                Modifier.padding(top = 16.dp),
                 style = TypeScale.TITLE.style(t.text.c()).copy(textAlign = TextAlign.Center),
             )
             Text(
-                stringResource(chatStateBody(state)), Modifier.padding(top = 8.dp, bottom = 20.dp),
+                if (state == ChatTabState.NOT_PAIRED) {
+                    if (assistantSpanish()) "Puedes conversar sin vincular una computadora. Añade tu clave API en Ajustes."
+                    else "Chat without pairing a computer. Add your API key in Settings."
+                } else stringResource(chatStateBody(state)),
+                Modifier.padding(top = 8.dp, bottom = 20.dp),
                 style = TypeScale.BODY.style(t.textDim.c()).copy(textAlign = TextAlign.Center),
             )
             when (ChatTab.action(state)) {
@@ -253,6 +283,22 @@ fun ChatScreen(model: AppModel, onHome: () -> Unit, onSettings: () -> Unit) {
                 style = TypeScale.SECONDARY.style(tokens().textDim.c()),
             )
         }
+        if (localMode && (!model.assistantNetworkOnline || model.assistantNetworkRestored)) {
+            Text(
+                if (!model.assistantNetworkOnline) {
+                    if (spanish) "Sin Internet. El chat volverá a funcionar cuando haya conexión."
+                    else "No Internet. Chat will work again when a connection is available."
+                } else {
+                    if (spanish) "Conexión restablecida. Ya puedes volver a enviar tu mensaje."
+                    else "Connection restored. You can send your message again."
+                },
+                Modifier.padding(horizontal = 4.dp, vertical = 6.dp)
+                    .semantics { liveRegion = LiveRegionMode.Polite },
+                style = TypeScale.SECONDARY.style(
+                    if (!model.assistantNetworkOnline) tokens().danger.c() else tokens().text.c()
+                ),
+            )
+        }
         if (!model.chatAvailable) {
             // The conversation stays readable; the reason sits above it.
             Panel(Modifier.padding(vertical = 4.dp)) {
@@ -349,7 +395,7 @@ private fun Bubble(m: ChatMessage) {
         if (m.text.isEmpty() && m.status == ChatStatus.STREAMING) TypingDots()
         else if (m.text.isNotEmpty()) SelectionContainer { MarkdownText(m.text) }
         if (m.status == ChatStatus.FAILED) {
-            Text(reasonText(m.reason), style = TypeScale.SECONDARY.style(tokens().danger.c()))
+            Text(visibleChatError(m.reason), style = TypeScale.SECONDARY.style(tokens().danger.c()))
         }
     }
 }
@@ -444,6 +490,10 @@ private fun Composer(model: AppModel, text: String, refusal: ChatSession.Refusal
             refusal == ChatSession.Refusal.TOO_LONG || length > limit -> stringResource(R.string.chat_ref_too_long)
             refusal == ChatSession.Refusal.NO_MODEL -> stringResource(R.string.chat_ref_no_model)
             refusal == ChatSession.Refusal.BUSY -> stringResource(R.string.chat_ref_busy)
+            refusal == ChatSession.Refusal.OFFLINE &&
+                AssistantPolicy.fromLocalId(model.activeChatModel) != null ->
+                if (assistantSpanish()) "Sin Internet en el teléfono. Reconecta e inténtalo otra vez."
+                else "The phone has no Internet. Reconnect and try again."
             refusal == ChatSession.Refusal.OFFLINE -> stringResource(R.string.chat_ref_offline)
             else -> null
         }

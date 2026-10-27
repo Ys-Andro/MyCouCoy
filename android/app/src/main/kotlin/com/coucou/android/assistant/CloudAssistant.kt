@@ -140,14 +140,18 @@ class CloudAssistant {
             messages.put(JSONObject().put("role", role)
                 .put("parts", JSONArray().put(JSONObject().put("text", message.text))))
         }
-        return JSONObject().put("contents", messages)
+        return JSONObject()
+            .put("systemInstruction", JSONObject().put("parts", JSONArray().put(
+                JSONObject().put("text", AssistantPrompt.instruction(request.languageTag))
+            )))
+            .put("contents", messages)
             .put("generationConfig", JSONObject().put("maxOutputTokens", 2048))
     }
 
     private fun nvidiaBody(request: AssistantRequest): JSONObject {
         val messages = JSONArray()
         messages.put(JSONObject().put("role", "system")
-            .put("content", "You are Coucou, a helpful AI assistant on Android. Respond clearly and in the user's language. Never claim to have performed device actions or accessed the screen unless a tool actually did it."))
+            .put("content", AssistantPrompt.instruction(request.languageTag)))
         for (message in request.history) {
             messages.put(JSONObject()
                 .put("role", if (message.role == ChatRole.USER) "user" else "assistant")

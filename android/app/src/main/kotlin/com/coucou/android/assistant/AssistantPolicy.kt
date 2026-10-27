@@ -20,6 +20,7 @@ data class AssistantRequest(
     val model: String,
     val apiKey: String,
     val history: List<ChatMessage>,
+    val languageTag: String = "en",
 )
 
 object AssistantPolicy {

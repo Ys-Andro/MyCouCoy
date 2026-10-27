@@ -63,6 +63,7 @@ import com.coucou.android.assistant.AssistantPolicy
 import com.coucou.android.assistant.AssistantProvider
 import com.coucou.android.assistant.AssistantPreferences
 import com.coucou.android.assistant.CloudAssistant
+import com.coucou.android.assistant.AssistantConnectivity
 import com.coucou.android.assistant.ProviderHistory
 import com.coucou.android.core.IslandSpec
 
@@ -243,12 +244,45 @@ class AppModel(private val context: Context) : LinkListener {
     var assistantModel by mutableStateOf(assistantPrefs.model()); private set
     var assistantConfigured by mutableStateOf(assistantPrefs.hasKey()); private set
     var assistantState by mutableStateOf(BotState.IDLE); private set
+    /** Validated Internet for phone AI, not the PC link state. */
+    var assistantNetworkOnline by mutableStateOf(AssistantConnectivity.isOnline(context)); private set
+    var assistantNetworkRestored by mutableStateOf(false); private set
+    private val clearRecoveryMessage = Runnable { assistantNetworkRestored = false }
+    private val phoneConnectivity = AssistantConnectivity(context.applicationContext) { online ->
+        main.post { networkChangedForAssistant(online) }
+    }
+    init { phoneConnectivity.start() }
     private var phoneChatId: String? = null
+
+    private fun networkChangedForAssistant(online: Boolean) {
+        if (online == assistantNetworkOnline) return
+        val wasOffline = !assistantNetworkOnline
+        assistantNetworkOnline = online
+        main.removeCallbacks(clearRecoveryMessage)
+        assistantNetworkRestored = online && wasOffline
+        if (assistantNetworkRestored) main.postDelayed(clearRecoveryMessage, 15_000L)
+        if (!online) {
+            val id = phoneChatId
+            if (id != null) {
+                phoneAi.cancel()
+                phoneChatId = null
+                chatSession.onError(id, "phone_offline")
+                chatChanged(save = true)
+                assistantState = BotState.ERROR
+                refreshIsland()
+            }
+        }
+    }
+
+    private fun assistantLanguage(): String {
+        val configured = AppLanguage.current(context)
+        return configured.ifBlank { context.resources.configuration.locales[0].toLanguageTag() }
+    }
     private val resetAssistantState = Runnable { assistantState = BotState.IDLE }
 
     val availableChatModels: List<ChatModel>
         get() = (if (assistantConfigured) listOf(
-            ChatModel(AssistantPolicy.localId(assistantProvider), "phone", "Coucou AI · " + assistantProvider.title + " / " + assistantModel)
+            ChatModel(AssistantPolicy.localId(assistantProvider), "phone", (if (assistantLanguage().startsWith("es", ignoreCase = true)) "Coucou IA · " else "Coucou AI · ") + assistantProvider.title + " / " + assistantModel)
         ) else emptyList()) + chatModels
 
     val activeChatModel: String?
@@ -341,6 +375,9 @@ class AppModel(private val context: Context) : LinkListener {
     fun chatSend(text: String): ChatSession.Refusal? {
         val selected = activeChatModel
         val local = AssistantPolicy.fromLocalId(selected)
+        if (local != null && !assistantNetworkOnline) return ChatSession.Refusal.OFFLINE
+        assistantNetworkRestored = false
+        main.removeCallbacks(clearRecoveryMessage)
         val sent = chatSession.send(text, selected, connected = chatAvailable)
         return when (sent) {
             is ChatSession.Sent.No -> sent.why
@@ -349,7 +386,10 @@ class AppModel(private val context: Context) : LinkListener {
                 if (local != null) {
                     val userTurn = chatSession.messages.lastOrNull { it.id == "u-" + sent.msg.id }
                     val request = assistantPrefs.request()?.takeIf { it.provider == local && userTurn != null }
-                        ?.copy(history = providerHistory.forRequest(local, userTurn!!))
+                        ?.copy(
+                            history = providerHistory.forRequest(local, userTurn!!),
+                            languageTag = assistantLanguage(),
+                        )
                     if (request == null) {
                         chatSession.onError(sent.msg.id, "no_key")
                         chatChanged(save = true)
@@ -382,7 +422,7 @@ class AppModel(private val context: Context) : LinkListener {
                                 }
                             },
                             onError = { reason ->
-                                chatSession.onError(id, reason)
+                                chatSession.onError(id, "phone_" + reason)
                                 phoneChatId = null
                                 chatChanged(save = true)
                                 assistantState = BotState.ERROR
