@@ -14,6 +14,10 @@ import type { WaIslandView, WaSettingsView, WaTestResult } from "./whatsapp";
 export const IS_TAURI =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+/** Linux builds use a quieter UI motion profile; canvas-drawn Mochi is untouched. */
+export const IS_LINUX =
+  typeof navigator !== "undefined" && navigator.userAgent.toLowerCase().includes("linux");
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T | null> {
   if (!IS_TAURI) return null;
   try {

@@ -8,14 +8,17 @@
 // the window is hidden, so a hidden window costs nothing, and skips the ones
 // scrolled out of sight.
 
+import { IS_LINUX } from "../core/bridge";
 import { BotEngine, hexToRGB } from "../mochi/engine";
-import { onScreen, shouldAnimate } from "./frames";
+import { onScreen, shouldAnimate, shouldAnimateVisible } from "./frames";
 import type { BotEmoteName, BotStateName } from "../core/layout";
 import type { Outfit } from "../mochi/wardrobe";
 
 interface Animated {
   el: HTMLCanvasElement;
-  draw(dt: number, t: number): void;
+  draw(dt: number, t: number): void | boolean;
+  /** A static Linux backdrop is removed from the frame loop after its first draw. */
+  once?: boolean;
   /** Pages are built before they are put in the window: dropped only once gone. */
   shown?: boolean;
   born?: number;
@@ -37,16 +40,25 @@ function loop(now: number) {
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
   const t = (now - start) / 1000;
+  let visible = 0;
+  let waiting = 0;
   for (const a of live) {
     if (!a.el.isConnected) {
       // Built but not shown yet: wait for it (a few seconds at most).
       if (a.shown || now - (a.born ??= now) > 5000) live.delete(a);
+      else waiting++;
       continue;
     }
     a.shown = true;
-    if (onScreen(a.el.getBoundingClientRect(), window.innerWidth, window.innerHeight)) a.draw(dt, t);
+    if (!onScreen(a.el.getBoundingClientRect(), window.innerWidth, window.innerHeight)) continue;
+    visible++;
+    const complete = a.draw(dt, t);
+    if (a.once && complete === true) live.delete(a);
   }
-  if (running()) frame = requestAnimationFrame(loop);
+  // On Linux, WebKitGTK no longer spins at display refresh while every canvas is
+  // scrolled out of view. Mochi canvases in view still animate at their normal rate.
+  const keepLinuxLoop = shouldAnimateVisible(visible, waiting, document.visibilityState, windowShown);
+  if (IS_LINUX ? keepLinuxLoop : running()) frame = requestAnimationFrame(loop);
 }
 
 function wake() {
@@ -57,6 +69,9 @@ function wake() {
 }
 
 document.addEventListener("visibilitychange", wake);
+// A scrolled-in Mochi wakes the loop; canvases outside the viewport stay asleep.
+document.addEventListener("scroll", wake, true);
+window.addEventListener("resize", wake, { passive: true });
 
 /** The window was shown or hidden (the `hub-visible` event): hidden, the loop
  *  stops at once; shown, it starts again. */
@@ -116,6 +131,42 @@ interface Particle {
 /** The deep black, the colour and the particles, on `canvas`; `pointerFrom` is
  *  the element whose pointer pushes the particles. */
 export function backdrop(canvas: HTMLCanvasElement, color: string, pointerFrom: HTMLElement, radius = 18) {
+  if (IS_LINUX) {
+    // Keep the colour and depth, but paint them once: drifting particles and
+    // pointer repulsion are decorative UI motion, not part of Mochi.
+    add({
+      el: canvas,
+      once: true,
+      draw() {
+        const { w, h, ctx } = fit(canvas);
+        if (!ctx || w === 0 || h === 0) return false;
+        ctx.clearRect(0, 0, w, h);
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(0, 0, w, h, radius);
+        ctx.clip();
+        ctx.fillStyle = "#020203";
+        ctx.fillRect(0, 0, w, h);
+        const lin = ctx.createLinearGradient(w, 0, w * 0.35, h);
+        lin.addColorStop(0, rgba(color, 0.1));
+        lin.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = lin;
+        ctx.fillRect(0, 0, w, h);
+        const radial = ctx.createRadialGradient(
+          w * 0.92, -h * 0.15, 0, w * 0.92, -h * 0.15, Math.max(w, h) * 0.55,
+        );
+        radial.addColorStop(0, rgba(color, 0.24));
+        radial.addColorStop(0.5, rgba(color, 0.06));
+        radial.addColorStop(1, "rgba(0,0,0,0)");
+        ctx.fillStyle = radial;
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+        return true;
+      },
+    });
+    return;
+  }
+
   let particles: Particle[] = [];
   let pointer: { x: number; y: number } | null = null;
   let strength = 0;

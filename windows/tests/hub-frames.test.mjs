@@ -4,7 +4,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { onScreen, shouldAnimate } from "../src/hub/frames.ts";
+import { onScreen, shouldAnimate, shouldAnimateVisible } from "../src/hub/frames.ts";
 
 test("the loop runs only with something to draw, the window shown and the page visible", () => {
   assert.equal(shouldAnimate(3, "visible", true), true);
@@ -30,4 +30,12 @@ test("a canvas scrolled out of sight, or not laid out, is skipped", () => {
   assert.equal(onScreen(box(900, 240, 800, 200), 1100, 720), false);
   assert.equal(onScreen(box(0, 1100, 300, 200), 1100, 720), false);
   assert.equal(onScreen(box(100, 240, 0, 0), 1100, 720), false);
+});
+
+test("Linux hub loop sleeps when every canvas is off-screen, but waits for newly mounted canvases", () => {
+  assert.equal(shouldAnimateVisible(0, 0, "visible", true), false);
+  assert.equal(shouldAnimateVisible(2, 0, "visible", true), true);
+  assert.equal(shouldAnimateVisible(0, 1, "visible", true), true);
+  assert.equal(shouldAnimateVisible(0, 1, "hidden", true), false);
+  assert.equal(shouldAnimateVisible(1, 0, "visible", false), false);
 });
