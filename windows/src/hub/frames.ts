@@ -18,6 +18,16 @@ export function shouldAnimate(live: number, pageVisibility: string, windowShown:
   return live > 0 && windowShown && pageVisibility === "visible";
 }
 
+/** Linux frame-loop policy: only visible canvases and not-yet-mounted canvases keep RAF alive. */
+export function shouldAnimateVisible(
+  visible: number,
+  waiting: number,
+  pageVisibility: string,
+  windowShown: boolean,
+): boolean {
+  return shouldAnimate(visible + waiting, pageVisibility, windowShown);
+}
+
 /** Whether a canvas at `box` shows at least one pixel of a `width`×`height`
  *  viewport: one scrolled out of the page, or not laid out, is not drawn. */
 export function onScreen(box: Box, width: number, height: number): boolean {

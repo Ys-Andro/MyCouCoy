@@ -4,7 +4,8 @@
 // island's settings are drawn here, one Notch page at a time.
 
 import "./settings.css";
-import { Bridge, onEvent, type HookPreview, type HookStatus, type ShortcutsReport } from "../core/bridge";
+import "../core/linux-motion.css";
+import { Bridge, IS_LINUX, onEvent, type HookPreview, type HookStatus, type ShortcutsReport } from "../core/bridge";
 import { CUSTOM_SERVER_KEY, providerDef, urlExposure } from "../core/providers";
 import {
   ISLAND_SHORTCUTS, SHORTCUTS, SHORTCUT_TEXT, activeKeys, displayKeys, duplicates, effective,
@@ -38,6 +39,8 @@ const KEY_STORE = navigator.userAgent.includes("Windows")
 
 let settings: Settings = { ...DEFAULT_SETTINGS };
 let version = "";
+
+if (IS_LINUX) document.documentElement.classList.add("linux-lite");
 
 const windowRoot = document.getElementById("hub")!;
 /** Where the Notch page being shown draws its sections. */

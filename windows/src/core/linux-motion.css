@@ -1,0 +1,29 @@
+/*
+ * Linux-only motion budget.
+ *
+ * The island and settings UI keep their layout, colour and depth, but decorative
+ * CSS animation is removed and interaction transitions are shortened. Mochi is
+ * drawn in dedicated Canvas elements, which are deliberately excluded here.
+ */
+html.linux-lite :not(canvas) {
+  animation: none !important;
+  transition-duration: 80ms !important;
+  transition-delay: 0ms !important;
+}
+
+/* The panel no longer zooms in/out when changing cards. */
+html.linux-lite #views .view {
+  transform: none !important;
+}
+
+/* No springy scaling or brightness flashes on ordinary controls. */
+html.linux-lite :is(button:active, .pill:hover, .send-btn:active) {
+  transform: none !important;
+  filter: none !important;
+}
+
+/* Keep Mochi's soft halo; only remove the expensive blur filter. */
+html.linux-lite #bot-glow {
+  filter: none !important;
+  transition-duration: 400ms !important;
+}
